@@ -13,6 +13,8 @@ __Prerequisites__
 
 __Basic Usage__
 
+You can duplicate the app to simulate multiple users and run each instance in different terminals.
+
 ```
 $ git clone https://git.xx.network/elixxir/xxdk-examples.git
 $ cd xxdk-examples
@@ -20,3 +22,12 @@ $ cd sample-messaging-app
 $ go mod tidy
 $ go run main.go
 ```
+
+__TODO:__
+
+(Currently, one has to poke around and run things manually.)
+
+- Make app run on the command line with user prompts for:
+  - sending a message
+  - sending/accepting auth request
+- Also print received messages
