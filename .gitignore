@@ -1,4 +1,5 @@
-sessionPath
-ndf.json
+statePath
+mainnet.crt
+mainnet.json
 user-contact.json
 client.log
