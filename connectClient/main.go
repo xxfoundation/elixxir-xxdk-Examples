@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"gitlab.com/elixxir/client/connect"
@@ -125,7 +127,7 @@ func main() {
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status changes
-	baseClient.GetCmix().AddHealthCallback(
+	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -179,5 +181,17 @@ func main() {
 
 	// Keep app running to receive messages-----------------------------------------------
 
-	select {}
+	// Wait until the user terminates the program
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	err = e2eClient.StopNetworkFollower()
+	if err != nil {
+		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
+	}
+
+	os.Exit(0)
 }
