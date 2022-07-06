@@ -100,7 +100,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = baseClient.StartNetworkFollower(networkFollowerTimeout)
+	err = e2eClient.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
