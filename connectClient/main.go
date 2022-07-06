@@ -159,6 +159,7 @@ func main() {
 	// Register a listener for messages--------------------------------------------------
 
 	// Listen for all types of messages using catalog.NoType
+	// User-defined behavior for message reception goes in the listener
 	_, err = handler.RegisterListener(catalog.NoType, listener{
 		name: "e2e Message Listener",
 	})

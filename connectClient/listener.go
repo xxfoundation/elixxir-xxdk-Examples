@@ -13,7 +13,7 @@ type listener struct {
 
 // Hear will be called whenever a message matching
 // the RegisterListener call is received
-// Message handling logic goes here
+// User-defined message handling logic goes here
 func (l listener) Hear(item receive.Message) {
 	jww.INFO.Printf("Message received: %v", item)
 }
