@@ -86,15 +86,6 @@ func main() {
 		}
 	}
 
-	// Create an E2E client
-	// The connect packages handles AuthCallbacks, xxdk.DefaultAuthCallbacks is fine here
-	params := xxdk.GetDefaultE2EParams()
-	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{}, identity, params)
-	if err != nil {
-		jww.FATAL.Panicf("Unable to Login: %+v", err)
-	}
-
 	// Save contact file----------------------------------------------------------------
 
 	// Save the contact file so that client can connect to this server
@@ -116,9 +107,10 @@ func main() {
 	// Start connection server----------------------------------------------------------
 
 	// Start the connection server, which will allow clients to start connections with you
+	e2eParams := xxdk.GetDefaultE2EParams()
 	connectionListParams := connect.DefaultConnectionListParams()
-	_, err = connect.StartServer(
-		identity, cb, baseClient, params, connectionListParams)
+	connectServer, err := connect.StartServer(
+		identity, cb, baseClient, e2eParams, connectionListParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to start connection server: %+v", err)
 	}
@@ -127,7 +119,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = e2eClient.StartNetworkFollower(networkFollowerTimeout)
+	err = connectServer.E2e.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -152,7 +144,7 @@ func main() {
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status changes
-	e2eClient.GetCmix().AddHealthCallback(
+	connectServer.E2e.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
