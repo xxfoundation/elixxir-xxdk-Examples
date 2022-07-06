@@ -23,7 +23,7 @@ func main() {
 	// configuration tool of some kind
 
 	// Set the output contact file path
-	contactFilePath := "restlikeServer.xxc"
+	contactFilePath := "restSingleUseServer.xxc"
 
 	// Set state file parameters
 	statePath := "statePath"
@@ -183,12 +183,19 @@ func main() {
 	err = e2eClient.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
-	} else {
-		jww.INFO.Printf("Stopped network follower.")
 	}
+
+	jww.INFO.Printf("Stopped network follower.")
 
 	// Close server on function exit
 	restlikeServer.Close()
+
+	err = e2eClient.StopNetworkFollower()
+	if err != nil {
+		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	}
+
+	jww.INFO.Printf("Stopped network follower.")
 
 	os.Exit(0)
 
