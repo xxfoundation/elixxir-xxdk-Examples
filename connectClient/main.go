@@ -3,7 +3,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/client/catalog"
 	"gitlab.com/elixxir/client/xxdk"
@@ -103,7 +102,7 @@ func main() {
 	networkFollowerTimeout := 5 * time.Second
 	err = baseClient.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
-		fmt.Printf("Failed to start network follower: %+v", err)
+		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
 
 	// Set up a wait for the network to be connected
@@ -170,10 +169,10 @@ func main() {
 	// Send a message to the server----------------------------------------------------
 
 	// Test message
-	msgBody := "If this message is sent successfully, we'll have established first contact with aliens."
+	msgBody := "If this message is sent successfully, we'll have established contact with the server."
 	roundIDs, messageID, timeSent, err := handler.SendE2E(catalog.XxMessage, []byte(msgBody), params.Base)
 	if err != nil {
-		fmt.Printf("Failed to send message: %+v", err)
+		jww.FATAL.Panicf("Failed to send message: %+v", err)
 	}
 	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
 
