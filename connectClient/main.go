@@ -127,7 +127,7 @@ func main() {
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status changes
-	baseClient.GetCmix().AddHealthCallback(
+	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
