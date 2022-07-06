@@ -32,7 +32,7 @@ func main() {
 	// but it is actually a marshalled file with a cryptographic signature attached.
 	// This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
-	certificatePath := "mainnet.crt"
+	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
 
 	// Check if state exists
