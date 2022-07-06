@@ -1,6 +1,9 @@
 package main
 
-import "gitlab.com/elixxir/client/restlike"
+import (
+	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/restlike"
+)
 
 // endpoint implements the restlike.Callback interface.
 type endpoint struct {
@@ -16,11 +19,15 @@ func NewEndpoint(uri restlike.URI, method restlike.Method) *endpoint {
 	}
 }
 
-// Callback adheres to the restlike.Callback interface. It is an example
-// of how an endpoint may respond to a request.
+// Callback will be called whenever a message is received by the server
+//  with a matching restlike.Method and restlike.URI.
+//
+// If no endpoint exists
+// 	the lower level of the restlike package returns an error
+//  to the requester.
+// User-defined message handling logic goes here.
 func (e *endpoint) Callback(
 	request *restlike.Message) (response *restlike.Message) {
-	// todo: implment me
-
+	jww.INFO.Printf("Request received: %v", request)
 	return
 }
