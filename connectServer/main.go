@@ -115,11 +115,10 @@ func main() {
 
 	// Start connection server----------------------------------------------------------
 
-	// Start the connection server, which
-	e2eParams := xxdk.GetDefaultE2EParams()
+	// Start the connection server, which will allow clients to start connections with you
 	connectionListParams := connect.DefaultConnectionListParams()
 	_, err = connect.StartServer(
-		identity, cb, baseClient, e2eParams, connectionListParams)
+		identity, cb, baseClient, params, connectionListParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to start connection server: %+v", err)
 	}
@@ -153,7 +152,7 @@ func main() {
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status changes
-	baseClient.GetCmix().AddHealthCallback(
+	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
