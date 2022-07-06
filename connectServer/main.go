@@ -20,6 +20,9 @@ func main() {
 
 	// Create a new client object-------------------------------------------------------
 
+	// Set the output contact file path
+	contactFilePath := "connectServer.xxc"
+
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
 	statePass := "password"
@@ -93,9 +96,6 @@ func main() {
 	}
 
 	// Save contact file----------------------------------------------------------------
-
-	// Get the contact file path
-	contactFilePath := "connectServer.xxc"
 
 	// Save the contact file so that client can connect to this server
 	writeContact(contactFilePath, identity.GetContact())

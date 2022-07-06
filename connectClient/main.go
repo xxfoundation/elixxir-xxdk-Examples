@@ -24,7 +24,7 @@ func main() {
 	// Create a new client object-------------------------------------------------------
 
 	// Path to the server contact file
-	serverContactPath := "server-contact.json"
+	serverContactPath := "connectServer.xxc"
 
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
