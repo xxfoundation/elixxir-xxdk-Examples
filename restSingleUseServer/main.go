@@ -37,6 +37,10 @@ func main() {
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
 
+	// Set the restlike parameters
+	exampleURI := restlike.URI("handleClient")
+	exampleMethod := restlike.Get
+
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
 
@@ -124,16 +128,10 @@ func main() {
 	restlikeServer := single.NewServer(identity.ID, dhKeyPrivateKey,
 		grp, e2eClient.GetCmix())
 
-	// Implement restlike endpoint---------------------------------------------------
-
-	// Set parameters to value(s) of your choice
-	exampleURI := restlike.URI("handleClient")
-	exampleMethod := restlike.Method(0)
-	endPoint := NewEndpoint(exampleURI, exampleMethod)
+	// Implement restlike endpoint---------------------------------------------
 
 	// Add endpoint
-	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod,
-		endPoint.Callback)
+	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod, Callback)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
 	}
