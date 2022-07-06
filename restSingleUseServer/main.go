@@ -3,12 +3,14 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/restlike"
 	"gitlab.com/elixxir/client/restlike/single"
 	"gitlab.com/elixxir/client/xxdk"
-	"gitlab.com/elixxir/crypto/cyclic"
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -109,16 +111,32 @@ func main() {
 	// Start rest-like single use server---------------------------------------
 
 	// Pull the reception
-	receptionIdentity := e2eClient.GetReceptionIdentity()
-	dhKeyPriv := &cyclic.Int{}
-	err = dhKeyPriv.UnmarshalJSON(receptionIdentity.DHKeyPrivate)
+	dhKeyPrivateKey, err := identity.GetDHKeyPrivate()
 	if err != nil {
-		jww.FATAL.Panicf("Unable to read diffie-hellman private key: %+v", err)
+		jww.FATAL.Panicf("Failed to get DH private key from identity: %+v", err)
 	}
 
+	grp, err := identity.GetGroup()
+	if err != nil {
+		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
+	}
 	// Initialize the server
-	single.NewServer(receptionIdentity.ID, dhPrivateKey,
-		e2eClient.GetE2E().GetGroup(), e2eClient.GetCmix())
+	restlikeServer := single.NewServer(identity.ID, dhKeyPrivateKey,
+		grp, e2eClient.GetCmix())
+
+	// Implement restlike endpoint---------------------------------------------------
+
+	// Set parameters to value(s) of your choice
+	exampleURI := restlike.URI("handleClient")
+	exampleMethod := restlike.Method(0)
+	endPoint := NewEndpoint(exampleURI, exampleMethod)
+
+	// Add endpoint
+	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod,
+		endPoint.Callback)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
+	}
 
 	// Start network threads---------------------------------------------------
 
@@ -159,8 +177,21 @@ func main() {
 
 	// Keep app running to receive messages------------------------------------
 
-	// NOTE: Some consumers may desire some implemented exit condition
-	// handling (SIGKILL, SIGABRT, etc.). That can be done here.
-	select {}
+	// Wait until the user terminates the program
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	err = e2eClient.StopNetworkFollower()
+	if err != nil {
+		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
+	}
+
+	// Close server on function exit
+	restlikeServer.Close()
+
+	os.Exit(0)
 
 }
