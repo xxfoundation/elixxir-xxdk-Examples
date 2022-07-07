@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"gitlab.com/elixxir/client/connect"
@@ -16,7 +18,7 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "client.log")
+	initLog(1, "server.log")
 
 	// Create a new client object-------------------------------------------------------
 
@@ -153,5 +155,17 @@ func main() {
 
 	// Keep app running to receive messages-----------------------------------------------
 
-	select {}
+	// Wait until the user terminates the program
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	err = connectServer.E2e.StopNetworkFollower()
+	if err != nil {
+		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
+	}
+
+	os.Exit(0)
 }
