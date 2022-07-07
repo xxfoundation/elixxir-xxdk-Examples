@@ -16,7 +16,7 @@ we provide a tool initializing a log.
 
 `listener.go` contains logic for handling the reception of a message via the
 established connection. In this example, it is very basic. We invite consumers
-to use this as a basis to implement more complex message listeners here.
+to use this as a basis to implement more complex message listeners.
 
 ## Build Instructions
 
