@@ -222,11 +222,12 @@ func main() {
 
 	jww.INFO.Printf("Response: %+v", response)
 
-	// Keep app running to receive messages-----------------------------------------------
+	// Keep app running to receive messages------------------------------------
 
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
 	err = e2eClient.StopNetworkFollower()

@@ -12,7 +12,10 @@ import (
 // 	the lower level of the restlike package returns an error
 //  to the requester.
 // User-defined message handling logic goes here.
-func Callback(request *restlike.Message) (response *restlike.Message) {
+func Callback(request *restlike.Message) *restlike.Message {
 	jww.INFO.Printf("Request received: %v", request)
-	return
+	response := &restlike.Message{}
+	response.Headers = &restlike.Headers{Headers: []byte("this is a response")}
+	response.Content = []byte("This is content")
+	return response
 }

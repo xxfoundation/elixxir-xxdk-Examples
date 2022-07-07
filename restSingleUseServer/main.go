@@ -16,7 +16,7 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "client.log")
+	initLog(1, "server.log")
 
 	// Create a new client object----------------------------------------------
 	// NOTE: For some (or all) of these parameters, you may want to use a
@@ -127,6 +127,7 @@ func main() {
 	// Initialize the server
 	restlikeServer := single.NewServer(identity.ID, dhKeyPrivateKey,
 		grp, e2eClient.GetCmix())
+	jww.INFO.Printf("Initialized restlike single use server")
 
 	// Implement restlike endpoint---------------------------------------------
 
@@ -135,6 +136,7 @@ func main() {
 	if err != nil {
 		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
 	}
+	jww.DEBUG.Printf("Added endpoint for restlike single use server")
 
 	// Start network threads---------------------------------------------------
 
@@ -178,6 +180,7 @@ func main() {
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
 	err = e2eClient.StopNetworkFollower()
