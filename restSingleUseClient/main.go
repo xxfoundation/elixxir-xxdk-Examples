@@ -153,23 +153,6 @@ func main() {
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
-	// Construct request-------------------------------------------------------
-
-	// Construct request
-	stream := e2eClient.GetRng().GetStream()
-	defer stream.Close()
-
-	grp, err := identity.GetGroup()
-	if err != nil {
-		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
-	}
-
-	request := restSingle.Request{
-		Net:    e2eClient.GetCmix(),
-		Rng:    stream,
-		E2eGrp: grp,
-	}
-
 	// Build contact object----------------------------------------------------
 
 	// Recipient's contact (read from a Client CLI-generated contact file)
@@ -187,6 +170,22 @@ func main() {
 		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
 	}
 	jww.INFO.Printf("Recipient contact: %+v", serverContact)
+
+	// Construct request-------------------------------------------------------
+
+	stream := e2eClient.GetRng().GetStream()
+	defer stream.Close()
+
+	grp, err := identity.GetGroup()
+	if err != nil {
+		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
+	}
+
+	request := restSingle.Request{
+		Net:    e2eClient.GetCmix(),
+		Rng:    stream,
+		E2eGrp: grp,
+	}
 
 	// Send request to the server synchronously--------------------------------
 
@@ -233,8 +232,9 @@ func main() {
 	err = e2eClient.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
 	}
-	jww.INFO.Printf("Stopped network follower.")
 
 	os.Exit(0)
 

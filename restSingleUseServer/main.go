@@ -183,19 +183,13 @@ func main() {
 	err = e2eClient.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
 	}
-
-	jww.INFO.Printf("Stopped network follower.")
 
 	// Close server on function exit
 	restlikeServer.Close()
-
-	err = e2eClient.StopNetworkFollower()
-	if err != nil {
-		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
-	}
-
-	jww.INFO.Printf("Stopped network follower.")
+	jww.INFO.Printf("Closed restlike server")
 
 	os.Exit(0)
 

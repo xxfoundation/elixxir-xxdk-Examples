@@ -1,1 +1,1 @@
-# xxdk Connection Client Example
+# xxdk Restlike Single Use Client Example
