@@ -63,9 +63,9 @@ func main() {
 		}
 	}
 
-	// Login to your client session-----------------------------------------------------
+	// Load client state and identity-----------------------------------------------------
 
-	// Login with the same sessionPath and sessionPass used to call NewClient()
+	// Load with the same sessionPath and sessionPass used to call NewClient()
 	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
