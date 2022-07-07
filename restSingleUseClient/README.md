@@ -2,7 +2,7 @@
 
 This mini-repository contains the example logic for running a basic REST-like 
 single use client. This is provided by the xx network team as a springboard to 
-help consumers better understand our API and how it functions. 
+help consumers better understand our API and how it may be used. 
 
 `main.go` contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
@@ -57,6 +57,11 @@ cd restSingleUseClient/
 go build -o client .
 ./client 
 ```
+
+This is a long-running process which may be stopped by a user inputted kill 
+signal. We recommend allow the process to run for a long enough time to complete
+its requests to the server and receive the server's responses. We go into detail
+on what this entails below.
 
 Once the REST-like client has set up and sent its request, you can verify
 by checking the server's log for this string `Request received:`
