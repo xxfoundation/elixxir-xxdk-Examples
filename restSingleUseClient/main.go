@@ -201,7 +201,7 @@ func main() {
 
 	jww.INFO.Printf("Response: %+v", response)
 
-	// Send request to the server synchronously--------------------------------
+	// Send request to the server asynchronously--------------------------------
 
 	// In order to asynchronously request, a callback is used to handle
 	// when the response is received. More complex response handling may be
