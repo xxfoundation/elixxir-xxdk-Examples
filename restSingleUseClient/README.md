@@ -59,12 +59,12 @@ go build -o client .
 ```
 
 This is a long-running process which may be stopped by a user inputted kill 
-signal. We recommend allow the process to run for a long enough time to complete
-its requests to the server and receive the server's responses. We go into detail
-on what this entails below.
+signal. We recommend allowing the process to run for a long enough time to 
+complete its requests to the server and receive the server's responses. We go
+into detail on what this entails below.
 
 Once the REST-like client has set up and sent its request, you can verify
-by checking the server's log for this string `Request received:`
+by checking the server's log for the string `Request received:`
 
 ```bash
 grep "Request received"  restSingleUseServer/server.log 

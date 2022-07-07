@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"gitlab.com/elixxir/client/connect"
@@ -16,9 +18,9 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "client.log")
+	initLog(1, "server.log")
 
-	// Create a new client object-------------------------------------------------------
+	// Create a new client object----------------------------------------------
 
 	// Set the output contact file path
 	contactFilePath := "connectServer.xxc"
@@ -26,9 +28,9 @@ func main() {
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
 	statePass := "password"
-	// The following connects to mainnet. For historical reasons it is called a json file
-	// but it is actually a marshalled file with a cryptographic signature attached.
-	// This may change in the future.
+	// The following connects to mainnet. For historical reasons it is called
+	// a json file but it is actually a marshalled file with a cryptographic
+	// signature attached. This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
@@ -50,7 +52,8 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL, string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(
+				ndfURL, string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
@@ -63,10 +66,11 @@ func main() {
 		}
 	}
 
-	// Load client state and identity-----------------------------------------------------
+	// Load client state and identity------------------------------------------
 
 	// Load with the same sessionPath and sessionPass used to call NewClient()
-	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
+	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass),
+		xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
 	}
@@ -86,12 +90,13 @@ func main() {
 		}
 	}
 
-	// Save contact file----------------------------------------------------------------
+	// Save contact file-------------------------------------------------------
 
 	// Save the contact file so that client can connect to this server
 	writeContact(contactFilePath, identity.GetContact())
 
-	// Handle incoming connections------------------------------------------------------
+	// Handle incoming connections---------------------------------------------
+	e2eParams := xxdk.GetDefaultE2EParams()
 
 	// Create callback for incoming connections
 	cb := func(connection connect.Connection) {
@@ -102,12 +107,24 @@ func main() {
 		if err != nil {
 			jww.FATAL.Panicf("Failed to register listener: %+v", err)
 		}
+
+		msgBody := "If this message is sent successfully, we'll have " +
+			"established contact with the client."
+
+		roundIDs, messageID, timeSent, err := connection.SendE2E(catalog.NoType,
+			[]byte(msgBody), e2eParams.Base)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to send message: %+v", err)
+		}
+		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID,
+			roundIDs, timeSent)
+
 	}
 
-	// Start connection server----------------------------------------------------------
+	// Start connection server-------------------------------------------------
 
-	// Start the connection server, which will allow clients to start connections with you
-	e2eParams := xxdk.GetDefaultE2EParams()
+	// Start the connection server, which will allow clients to start
+	//connections with you
 	connectionListParams := connect.DefaultConnectionListParams()
 	connectServer, err := connect.StartServer(
 		identity, cb, baseClient, e2eParams, connectionListParams)
@@ -115,7 +132,7 @@ func main() {
 		jww.FATAL.Panicf("Unable to start connection server: %+v", err)
 	}
 
-	// Start network threads------------------------------------------------------------
+	// Start network threads---------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
@@ -143,7 +160,8 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network health status changes
+	// Provide a callback that will be signalled when network health
+	// status changes
 	connectServer.E2e.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
@@ -151,7 +169,19 @@ func main() {
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
-	// Keep app running to receive messages-----------------------------------------------
+	// Keep app running to receive messages------------------------------------
 
-	select {}
+	// Wait until the user terminates the program
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	err = connectServer.E2e.StopNetworkFollower()
+	if err != nil {
+		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
+	} else {
+		jww.INFO.Printf("Stopped network follower.")
+	}
+
+	os.Exit(0)
 }

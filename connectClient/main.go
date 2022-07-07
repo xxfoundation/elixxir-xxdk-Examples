@@ -21,7 +21,7 @@ func main() {
 	// Logging
 	initLog(1, "client.log")
 
-	// Create a new client object-------------------------------------------------------
+	// Create a new client object----------------------------------------------
 
 	// Path to the server contact file
 	serverContactPath := "connectServer.xxc"
@@ -29,9 +29,9 @@ func main() {
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
 	statePass := "password"
-	// The following connects to mainnet. For historical reasons it is called a json file
-	// but it is actually a marshalled file with a cryptographic signature attached.
-	// This may change in the future.
+	// The following connects to mainnet. For historical reasons it is called a
+	// json file but it is actually a marshalled file with a cryptographic
+	// signature attached. This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
@@ -53,7 +53,8 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL, string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(
+				ndfURL, string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
@@ -66,10 +67,11 @@ func main() {
 		}
 	}
 
-	// Login to your client session-----------------------------------------------------
+	// Login to your client session--------------------------------------------
 
 	// Login with the same sessionPath and sessionPass used to call NewClient()
-	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
+	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass),
+		xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
 	}
@@ -83,22 +85,25 @@ func main() {
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, baseClient)
+		err = xxdk.StoreReceptionIdentity(
+			identityStorageKey, identity, baseClient)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
 	}
 
 	// Create an E2E client
-	// The connect packages handles AuthCallbacks, xxdk.DefaultAuthCallbacks is fine here
+	// The `connect` packages handles AuthCallbacks,
+	// `xxdk.DefaultAuthCallbacks` is fine here
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{}, identity, params)
+	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{},
+		identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
 
-	// Start network threads------------------------------------------------------------
+	// Start network threads----------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
@@ -126,7 +131,8 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network health status changes
+	// Provide a callback that will be signalled when network
+	// health status changes
 	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
@@ -134,7 +140,7 @@ func main() {
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
-	// Connect with the server--------------------------------------------------
+	// Connect with the server-------------------------------------------------
 
 	// Recipient's contact (read from a Client CLI-generated contact file)
 	contactData, err := ioutil.ReadFile(serverContactPath)
@@ -143,8 +149,9 @@ func main() {
 	}
 
 	// Imported "gitlab.com/elixxir/crypto/contact"
-	// which provides an `Unmarshal` function to convert the byte slice ([]byte) output
-	// of `ioutil.ReadFile()` to the `Contact` type expected by `RequestAuthenticatedChannel()`
+	// which provides an `Unmarshal` function to convert the
+	// byte slice ([]byte) output of `ioutil.ReadFile()` to the `Contact` type
+	// expected by `RequestAuthenticatedChannel()`
 	recipientContact, err := contact.Unmarshal(contactData)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
@@ -156,9 +163,10 @@ func main() {
 	if err != nil {
 		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
 	}
-	jww.INFO.Printf("Connect with %s successfully established!", recipientContact.ID)
+	jww.INFO.Printf("Connect with %s successfully established!",
+		recipientContact.ID)
 
-	// Register a listener for messages--------------------------------------------------
+	// Register a listener for messages----------------------------------------
 
 	// Listen for all types of messages using catalog.NoType
 	// User-defined behavior for message reception goes in the listener
@@ -169,17 +177,20 @@ func main() {
 		jww.FATAL.Panicf("Could not register message listener: %+v", err)
 	}
 
-	// Send a message to the server----------------------------------------------------
+	// Send a message to the server--------------------------------------------
 
 	// Test message
-	msgBody := "If this message is sent successfully, we'll have established contact with the server."
-	roundIDs, messageID, timeSent, err := handler.SendE2E(catalog.XxMessage, []byte(msgBody), params.Base)
+	msgBody := "If this message is sent successfully, we'll have established " +
+		"contact with the server."
+	roundIDs, messageID, timeSent, err := handler.SendE2E(
+		catalog.XxMessage, []byte(msgBody), params.Base)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to send message: %+v", err)
 	}
-	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
+	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v",
+		messageID, roundIDs, timeSent)
 
-	// Keep app running to receive messages-----------------------------------------------
+	// Keep app running to receive messages------------------------------------
 
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)

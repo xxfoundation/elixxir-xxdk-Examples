@@ -10,8 +10,8 @@ type listener struct {
 	name string
 }
 
-// Hear will be called whenever a message matching the RegisterListener call is
-// received.
+// Hear will be called whenever a message matching the
+// RegisterListener call is received.
 //
 // User-defined message handling logic goes here.
 func (l *listener) Hear(item receive.Message) {
