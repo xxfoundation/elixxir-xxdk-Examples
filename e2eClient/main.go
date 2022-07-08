@@ -20,15 +20,16 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "client.log")
+	initLog(1, "client2.log")
 
 	// Create a new client object-------------------------------------------------------
 
 	// Path to the recipient contact file
-	recipientContactPath := "recipient.xxc"
+	recipientContactPath := "contact.xxc"
+	myContactPath := "recipient.xxc"
 
 	// You would ideally use a configuration tool to acquire these parameters
-	statePath := "statePath"
+	statePath := "statePathRecipient"
 	statePass := "password"
 	// The following connects to mainnet. For historical reasons it is called a json file
 	// but it is actually a marshalled file with a cryptographic signature attached.
@@ -90,11 +91,17 @@ func main() {
 		}
 	}
 
+	err = ioutil.WriteFile(myContactPath, identity.GetContact().Marshal(), fs.ModePerm)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to write contact to file at %s: %+v", myContactPath, err)
+	}
+
 	// Create an E2E client
 	// Pass in auth object which controls auth callbacks for this client
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	xxdkClient, err := xxdk.Login(baseClient, &auth{}, identity, params)
+	confirmChan := make(chan contact.Contact)
+	xxdkClient, err := xxdk.Login(baseClient, &auth{confirmChan: confirmChan}, identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
@@ -138,28 +145,53 @@ func main() {
 
 	// Connect with the recipient--------------------------------------------------
 
-	// Recipient's contact (read from a Client CLI-generated contact file)
-	contactData, err := ioutil.ReadFile(recipientContactPath)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to read recipient contact file: %+v", err)
-	}
+	if recipientContactPath != "" {
+		// Wait for 30 seconds to ensure network connectivity
+		time.Sleep(30 * time.Second)
 
-	// Imported "gitlab.com/elixxir/crypto/contact"
-	// which provides an `Unmarshal` function to convert the byte slice ([]byte) output
-	// of `ioutil.ReadFile()` to the `Contact` type expected by `RequestAuthenticatedChannel()`
-	recipientContact, err := contact.Unmarshal(contactData)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
-	}
-	jww.INFO.Printf("Recipient contact: %+v", recipientContact)
-
-	// Check that the partner exists, if not send a request
-	_, err = e2eClient.GetPartner(recipientContact.ID)
-	if err != nil {
-		_, err = xxdkClient.GetAuth().Request(recipientContact, fact.FactList{})
+		// Recipient's contact (read from a Client CLI-generated contact file)
+		contactData, err := ioutil.ReadFile(recipientContactPath)
 		if err != nil {
-			jww.FATAL.Panicf("Failed to send contact request to %s: %+v", recipientContact.ID.String(), err)
+			jww.FATAL.Panicf("Failed to read recipient contact file: %+v", err)
 		}
+
+		// Imported "gitlab.com/elixxir/crypto/contact"
+		// which provides an `Unmarshal` function to convert the byte slice ([]byte) output
+		// of `ioutil.ReadFile()` to the `Contact` type expected by `RequestAuthenticatedChannel()`
+		recipientContact, err := contact.Unmarshal(contactData)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to get contact data: %+v", err)
+		}
+		jww.INFO.Printf("Recipient contact: %+v", recipientContact)
+
+		// Check that the partner exists, if not send a request
+		_, err = e2eClient.GetPartner(recipientContact.ID)
+		if err != nil {
+			_, err = xxdkClient.GetAuth().Request(recipientContact, fact.FactList{})
+			if err != nil {
+				jww.FATAL.Panicf("Failed to send contact request to %s: %+v", recipientContact.ID.String(), err)
+			}
+			timeout := time.NewTimer(30 * time.Second)
+			select {
+			case pc := <-confirmChan:
+				if !pc.ID.Cmp(recipientContact.ID) {
+					jww.FATAL.Panicf("Did not receive confirmation for the requested contact")
+				}
+				break
+			case <-timeout.C:
+				jww.FATAL.Panicf("Timed out waiting to receive confirmation of e2e relationship with partner")
+			}
+		}
+
+		// Send a message to the recipient----------------------------------------------------
+
+		// Test message
+		msgBody := "If this message is sent successfully, we'll have established contact with the recipient."
+		roundIDs, messageID, timeSent, err := e2eClient.SendE2E(catalog.XxMessage, recipientContact.ID, []byte(msgBody), params.Base)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to send message: %+v", err)
+		}
+		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
 	}
 
 	// Register a listener for messages--------------------------------------------------
@@ -168,16 +200,6 @@ func main() {
 	// Listen for messages from all users using id.ZeroUser
 	// User-defined behavior for message reception goes in the listener
 	_ = e2eClient.RegisterListener(&id.ZeroUser, catalog.NoType, listener{name: "e2e Message Listener"})
-
-	// Send a message to the recipient----------------------------------------------------
-
-	// Test message
-	msgBody := "If this message is sent successfully, we'll have established contact with the recipient."
-	roundIDs, messageID, timeSent, err := e2eClient.SendE2E(catalog.XxMessage, recipientContact.ID, []byte(msgBody), params.Base)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to send message: %+v", err)
-	}
-	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
 
 	// Keep app running to receive messages-----------------------------------------------
 
