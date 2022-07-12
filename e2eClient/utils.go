@@ -2,6 +2,8 @@ package main
 
 import (
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/crypto/contact"
+	"gitlab.com/xx_network/primitives/utils"
 	"io/ioutil"
 	"log"
 	"os"
@@ -34,5 +36,15 @@ func initLog(threshold uint, logPath string) {
 		jww.INFO.Printf("log level set to: INFO")
 		jww.SetStdoutThreshold(jww.LevelInfo)
 		jww.SetLogThreshold(jww.LevelInfo)
+	}
+}
+
+func writeContact(outfilePath string, c contact.Contact) {
+	err := utils.WriteFileDef(outfilePath, c.Marshal())
+
+	if err != nil {
+		jww.ERROR.Printf("could not write contact file: %+v", err)
+	} else {
+		jww.INFO.Printf("contact written to %s successfully", outfilePath)
 	}
 }

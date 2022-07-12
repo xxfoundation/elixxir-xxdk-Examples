@@ -91,16 +91,13 @@ func main() {
 		}
 	}
 
-	err = ioutil.WriteFile(myContactPath, identity.GetContact().Marshal(), fs.ModePerm)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to write contact to file at %s: %+v", myContactPath, err)
-	}
+	writeContact(myContactPath, identity.GetContact())
 
 	// Create an E2E client
 	// Pass in auth object which controls auth callbacks for this client
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	confirmChan := make(chan contact.Contact)
+	confirmChan := make(chan contact.Contact, 5)
 	xxdkClient, err := xxdk.Login(baseClient, &auth{confirmChan: confirmChan}, identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
@@ -142,6 +139,13 @@ func main() {
 		})
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
+
+	// Register a listener for messages--------------------------------------------------
+
+	// Listen for all types of messages using catalog.NoType
+	// Listen for messages from all users using id.ZeroUser
+	// User-defined behavior for message reception goes in the listener
+	_ = e2eClient.RegisterListener(&id.ZeroUser, catalog.NoType, listener{name: "e2e Message Listener"})
 
 	// Connect with the recipient--------------------------------------------------
 
@@ -193,13 +197,6 @@ func main() {
 		}
 		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
 	}
-
-	// Register a listener for messages--------------------------------------------------
-
-	// Listen for all types of messages using catalog.NoType
-	// Listen for messages from all users using id.ZeroUser
-	// User-defined behavior for message reception goes in the listener
-	_ = e2eClient.RegisterListener(&id.ZeroUser, catalog.NoType, listener{name: "e2e Message Listener"})
 
 	// Keep app running to receive messages-----------------------------------------------
 
