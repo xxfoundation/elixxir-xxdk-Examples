@@ -1,20 +1,19 @@
-// Sending Normal messages (Getting Started guide)
 package main
 
 import (
-	"errors"
+	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/catalog"
+	"gitlab.com/elixxir/client/restlike"
+	restSingle "gitlab.com/elixxir/client/restlike/single"
+	"gitlab.com/elixxir/client/single"
 	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/crypto/contact"
 	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"gitlab.com/elixxir/client/connect"
-	"gitlab.com/elixxir/crypto/contact"
 )
 
 func main() {
@@ -22,19 +21,34 @@ func main() {
 	initLog(1, "client.log")
 
 	// Create a new client object----------------------------------------------
+	// NOTE: For some (or all) of these parameters, you may want to use a
+	// configuration tool of some kind
 
 	// Path to the server contact file
-	serverContactPath := "connectServer.xxc"
+	serverContactPath := "restSingleUseServer.xxc"
 
-	// You would ideally use a configuration tool to acquire these parameters
+	// Set state file parameters
 	statePath := "statePath"
 	statePass := "password"
-	// The following connects to mainnet. For historical reasons it is called a
-	// json file but it is actually a marshalled file with a cryptographic
-	// signature attached. This may change in the future.
+
+	// The following connects to mainnet. For historical reasons
+	// it is called a json file but it is actually a marshalled
+	// file with a cryptographic signature attached.
+	// This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
+
+	// Set the restlike parameters
+	exampleURI := restlike.URI("handleClient")
+	exampleMethod := restlike.Get
+	exampleContentBytes := []byte("this is some content")
+	exampleContent := restlike.Data{}
+	copy(exampleContent[:], exampleContentBytes)
+	exampleHeaders := &restlike.Headers{
+		Headers: []byte("This is a header"),
+	}
+	singleParams := single.GetDefaultRequestParams()
 
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
@@ -53,14 +67,14 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(
-				ndfURL, string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL,
+				string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
 		}
 
-		// Initialize the state
+		// Initialize the state using the state file
 		err = xxdk.NewCmix(string(ndfJSON), statePath, []byte(statePass), "")
 		if err != nil {
 			jww.FATAL.Panicf("Failed to initialize state: %+v", err)
@@ -85,16 +99,15 @@ func main() {
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(
-			identityStorageKey, identity, baseClient)
+		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, baseClient)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
 	}
 
 	// Create an E2E client
-	// The `connect` packages handles AuthCallbacks,
-	// `xxdk.DefaultAuthCallbacks` is fine here
+	// The 'restlike' package handles AuthCallbacks,
+	// xxdk.DefaultAuthCallbacks is fine here
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
 	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{},
@@ -103,7 +116,7 @@ func main() {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
 
-	// Start network threads----------------------------------------------------
+	// Start network threads---------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
@@ -131,8 +144,8 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network
-	// health status changes
+	// Provide a callback that will be signalled when network health status
+	// changes
 	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
@@ -140,7 +153,7 @@ func main() {
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
-	// Connect with the server-------------------------------------------------
+	// Build contact object----------------------------------------------------
 
 	// Recipient's contact (read from a Client CLI-generated contact file)
 	contactData, err := ioutil.ReadFile(serverContactPath)
@@ -149,52 +162,72 @@ func main() {
 	}
 
 	// Imported "gitlab.com/elixxir/crypto/contact"
-	// which provides an `Unmarshal` function to convert the
-	// byte slice ([]byte) output of `ioutil.ReadFile()` to the `Contact` type
-	// expected by `RequestAuthenticatedChannel()`
-	recipientContact, err := contact.Unmarshal(contactData)
+	// which provides an `Unmarshal` function to convert the byte slice ([]byte)
+	// output of `ioutil.ReadFile()` to the `Contact` type expected by
+	// `RequestAuthenticatedChannel()`
+	serverContact, err := contact.Unmarshal(contactData)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
 	}
-	jww.INFO.Printf("Recipient contact: %+v", recipientContact)
+	jww.INFO.Printf("Recipient contact: %+v", serverContact)
 
-	// Create the connection
-	handler, err := connect.Connect(recipientContact, e2eClient, params)
+	// Construct request-------------------------------------------------------
+
+	stream := e2eClient.GetRng().GetStream()
+	defer stream.Close()
+
+	grp, err := identity.GetGroup()
 	if err != nil {
-		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
+		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
 	}
-	jww.INFO.Printf("Connect with %s successfully established!",
-		recipientContact.ID)
 
-	// Register a listener for messages----------------------------------------
+	request := restSingle.Request{
+		Net:    e2eClient.GetCmix(),
+		Rng:    stream,
+		E2eGrp: grp,
+	}
 
-	// Listen for all types of messages using catalog.NoType
-	// User-defined behavior for message reception goes in the listener
-	_, err = handler.RegisterListener(catalog.NoType, listener{
-		name: "e2e Message Listener",
+	// Send request to the server synchronously--------------------------------
+
+	// This is a synchronous request, meaning it will block until
+	// a response is received
+	response, err := request.Request(serverContact, exampleMethod, exampleURI,
+		exampleContent, exampleHeaders, singleParams)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to call synchronous request "+
+			"with server: %+v", err)
+	}
+
+	jww.INFO.Printf("Response: %+v", response)
+
+	// Send request to the server asynchronously--------------------------------
+
+	// In order to asynchronously request, a callback is used to handle
+	// when the response is received. More complex response handling may be
+	// implemented within the `restlike.RequestCallback`.
+	responseChan := make(chan *restlike.Message, 1)
+	cb := restlike.RequestCallback(func(message *restlike.Message) {
+		responseChan <- message
 	})
+
+	// Make request
+	err = request.AsyncRequest(serverContact, exampleMethod, exampleURI,
+		exampleContent, exampleHeaders, cb, singleParams)
 	if err != nil {
-		jww.FATAL.Panicf("Could not register message listener: %+v", err)
+		jww.FATAL.Panicf("Failed to call asynchronous request with server: %+v",
+			err)
 	}
 
-	// Send a message to the server--------------------------------------------
+	response = <-responseChan
 
-	// Test message
-	msgBody := "If this message is sent successfully, we'll have established " +
-		"contact with the server."
-	roundIDs, messageID, timeSent, err := handler.SendE2E(
-		catalog.XxMessage, []byte(msgBody), params.Base)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to send message: %+v", err)
-	}
-	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v",
-		messageID, roundIDs, timeSent)
+	jww.INFO.Printf("Response: %+v", response)
 
 	// Keep app running to receive messages------------------------------------
 
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
 	err = e2eClient.StopNetworkFollower()
@@ -205,4 +238,5 @@ func main() {
 	}
 
 	os.Exit(0)
+
 }

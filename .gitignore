@@ -25,3 +25,5 @@ session*/
 *.xxchan
 *.pem
 *.log
+statePath/
+*.xxc
