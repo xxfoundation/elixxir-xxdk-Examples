@@ -1,4 +1,4 @@
-module restConnectServer
+module restConnectServerExample
 
 go 1.18
 

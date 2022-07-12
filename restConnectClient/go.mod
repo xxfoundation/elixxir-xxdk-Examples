@@ -1,4 +1,4 @@
-module restConnectClient
+module restConnectClientExample
 
 go 1.17
 
