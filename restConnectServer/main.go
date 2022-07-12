@@ -80,7 +80,7 @@ func main() {
 	// Login to your client session--------------------------------------------
 
 	// Login with the same sessionPath and sessionPass used to call NewClient()
-	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass),
+	net, err := xxdk.LoadCmix(statePath, []byte(statePass),
 		xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
@@ -88,14 +88,14 @@ func main() {
 
 	// Get reception identity (automatically created if one does not exist)
 	identityStorageKey := "identityStorageKey"
-	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, baseClient)
+	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, net)
 	if err != nil {
 		// If no extant xxdk.ReceptionIdentity, generate and store a new one
-		identity, err = xxdk.MakeReceptionIdentity(baseClient)
+		identity, err = xxdk.MakeReceptionIdentity(net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, baseClient)
+		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
@@ -105,7 +105,7 @@ func main() {
 	// The 'restlike' package handles AuthCallbacks,
 	// xxdk.DefaultAuthCallbacks is fine here
 	jww.INFO.Printf("Using E2E parameters: %+v", e2eParams)
-	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{},
+	messenger, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{},
 		identity, e2eParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
@@ -117,7 +117,7 @@ func main() {
 	writeContact(contactFilePath, identity.GetContact())
 
 	// Start rest-like connect server------------------------------------------
-	restlikeServer, err := restConnect.NewServer(identity, e2eClient.Cmix,
+	restlikeServer, err := restConnect.NewServer(identity, messenger.Cmix,
 		e2eParams, connParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to start restlike connect server: %+v", err)
@@ -137,7 +137,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = e2eClient.StartNetworkFollower(networkFollowerTimeout)
+	err = messenger.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -163,7 +163,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network
 	// health status changes
-	e2eClient.GetCmix().AddHealthCallback(
+	messenger.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -178,7 +178,7 @@ func main() {
 	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
-	err = e2eClient.StopNetworkFollower()
+	err = messenger.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
