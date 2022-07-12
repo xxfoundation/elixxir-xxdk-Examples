@@ -3,9 +3,12 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/connect"
+	"gitlab.com/elixxir/client/e2e"
 	"gitlab.com/elixxir/client/restlike"
-	"gitlab.com/elixxir/client/restlike/single"
+	restConnect "gitlab.com/elixxir/client/restlike/connect"
 	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/crypto/contact"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -16,14 +19,14 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "server.log")
+	initLog(1, "client.log")
 
 	// Create a new client object----------------------------------------------
 	// NOTE: For some (or all) of these parameters, you may want to use a
 	// configuration tool of some kind
 
-	// Set the output contact file path
-	contactFilePath := "restSingleUseServer.xxc"
+	// Path to the server contact file
+	serverContactPath := "restConnectServer.xxc"
 
 	// Set state file parameters
 	statePath := "statePath"
@@ -40,6 +43,15 @@ func main() {
 	// Set the restlike parameters
 	exampleURI := restlike.URI("handleClient")
 	exampleMethod := restlike.Get
+	exampleContentBytes := []byte("this is some content")
+	exampleContent := restlike.Data{}
+	copy(exampleContent[:], exampleContentBytes)
+	exampleHeaders := &restlike.Headers{
+		Headers: []byte("This is a header"),
+	}
+
+	// Parameters for e2e client & restlike server
+	e2eParams := e2e.GetDefaultParams()
 
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
@@ -107,37 +119,6 @@ func main() {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
 
-	// Save contact file-------------------------------------------------------
-
-	// Save the contact file so that client can connect to this server
-	writeContact(contactFilePath, identity.GetContact())
-
-	// Start rest-like single use server---------------------------------------
-
-	// Pull the reception identity information
-	dhKeyPrivateKey, err := identity.GetDHKeyPrivate()
-	if err != nil {
-		jww.FATAL.Panicf("Failed to get DH private key from identity: %+v", err)
-	}
-
-	grp, err := identity.GetGroup()
-	if err != nil {
-		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
-	}
-	// Initialize the server
-	restlikeServer := single.NewServer(identity.ID, dhKeyPrivateKey,
-		grp, e2eClient.GetCmix())
-	jww.INFO.Printf("Initialized restlike single use server")
-
-	// Implement restlike endpoint---------------------------------------------
-
-	// Add endpoint
-	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod, Callback)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
-	}
-	jww.DEBUG.Printf("Added endpoint for restlike single use server")
-
 	// Start network threads---------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
@@ -166,14 +147,91 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network
-	// health status changes
+	// Provide a callback that will be signalled when network health status
+	// changes
 	e2eClient.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
+
+	// Build contact object----------------------------------------------------
+
+	// Recipient's contact (read from a Client CLI-generated contact file)
+	contactData, err := ioutil.ReadFile(serverContactPath)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to read server contact file: %+v", err)
+	}
+
+	// Imported "gitlab.com/elixxir/crypto/contact"
+	// which provides an `Unmarshal` function to convert the byte slice ([]byte)
+	// output of `ioutil.ReadFile()` to the `Contact` type expected by
+	// `RequestAuthenticatedChannel()`
+	serverContact, err := contact.Unmarshal(contactData)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
+	}
+	jww.INFO.Printf("Recipient contact: %+v", serverContact)
+
+	// Establish connection with the server------------------------------------
+
+	handler, err := connect.Connect(serverContact, e2eClient, params)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
+	}
+	jww.INFO.Printf("Connect with %s successfully established!",
+		serverContact.ID)
+
+	// Construct request-------------------------------------------------------
+
+	stream := e2eClient.GetRng().GetStream()
+	defer stream.Close()
+
+	grp, err := identity.GetGroup()
+	if err != nil {
+		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
+	}
+
+	request := restConnect.Request{
+		Net:    handler,
+		Rng:    stream,
+		E2eGrp: grp,
+	}
+
+	// Send request to the server synchronously--------------------------------
+	// This is a synchronous request, meaning it will block until
+	// a response is received
+	response, err := request.Request(exampleMethod, exampleURI,
+		exampleContent, exampleHeaders, e2eParams)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to call synchronous request "+
+			"with server: %+v", err)
+	}
+
+	jww.INFO.Printf("Response: %+v", response)
+
+	// Send request to the server asynchronously--------------------------------
+
+	// In order to asynchronously request, a callback is used to handle
+	// when the response is received. More complex response handling may be
+	// implemented within the `restlike.RequestCallback`.
+	responseChan := make(chan *restlike.Message, 1)
+	cb := restlike.RequestCallback(func(message *restlike.Message) {
+		responseChan <- message
+	})
+
+	// Make request
+	err = request.AsyncRequest(exampleMethod, exampleURI,
+		exampleContent, exampleHeaders, cb, e2eParams)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to call asynchronous request with server: %+v",
+			err)
+	}
+
+	response = <-responseChan
+
+	jww.INFO.Printf("Response: %+v", response)
 
 	// Keep app running to receive messages------------------------------------
 
@@ -189,10 +247,6 @@ func main() {
 	} else {
 		jww.INFO.Printf("Stopped network follower.")
 	}
-
-	// Close server on function exit
-	restlikeServer.Close()
-	jww.INFO.Printf("Closed restlike server")
 
 	os.Exit(0)
 

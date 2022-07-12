@@ -3,8 +3,9 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/connect"
 	"gitlab.com/elixxir/client/restlike"
-	"gitlab.com/elixxir/client/restlike/single"
+	restConnect "gitlab.com/elixxir/client/restlike/connect"
 	"gitlab.com/elixxir/client/xxdk"
 	"io/fs"
 	"io/ioutil"
@@ -23,7 +24,7 @@ func main() {
 	// configuration tool of some kind
 
 	// Set the output contact file path
-	contactFilePath := "restSingleUseServer.xxc"
+	contactFilePath := "restConnectServer.xxc"
 
 	// Set state file parameters
 	statePath := "statePath"
@@ -36,6 +37,10 @@ func main() {
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
+
+	// Parameters for e2e client & restlike server
+	e2eParams := xxdk.GetDefaultE2EParams()
+	connParams := connect.DefaultConnectionListParams()
 
 	// Set the restlike parameters
 	exampleURI := restlike.URI("handleClient")
@@ -99,10 +104,9 @@ func main() {
 	// Create an E2E client
 	// The 'restlike' package handles AuthCallbacks,
 	// xxdk.DefaultAuthCallbacks is fine here
-	params := xxdk.GetDefaultE2EParams()
-	jww.INFO.Printf("Using E2E parameters: %+v", params)
+	jww.INFO.Printf("Using E2E parameters: %+v", e2eParams)
 	e2eClient, err := xxdk.Login(baseClient, xxdk.DefaultAuthCallbacks{},
-		identity, params)
+		identity, e2eParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
@@ -112,22 +116,13 @@ func main() {
 	// Save the contact file so that client can connect to this server
 	writeContact(contactFilePath, identity.GetContact())
 
-	// Start rest-like single use server---------------------------------------
-
-	// Pull the reception identity information
-	dhKeyPrivateKey, err := identity.GetDHKeyPrivate()
+	// Start rest-like connect server------------------------------------------
+	restlikeServer, err := restConnect.NewServer(identity, e2eClient.Cmix,
+		e2eParams, connParams)
 	if err != nil {
-		jww.FATAL.Panicf("Failed to get DH private key from identity: %+v", err)
+		jww.FATAL.Panicf("Unable to start restlike connect server: %+v", err)
 	}
-
-	grp, err := identity.GetGroup()
-	if err != nil {
-		jww.FATAL.Panicf("Failed to get group from identity: %+v", err)
-	}
-	// Initialize the server
-	restlikeServer := single.NewServer(identity.ID, dhKeyPrivateKey,
-		grp, e2eClient.GetCmix())
-	jww.INFO.Printf("Initialized restlike single use server")
+	jww.INFO.Printf("Initialized restlike connect server")
 
 	// Implement restlike endpoint---------------------------------------------
 
@@ -136,7 +131,7 @@ func main() {
 	if err != nil {
 		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
 	}
-	jww.DEBUG.Printf("Added endpoint for restlike single use server")
+	jww.DEBUG.Printf("Added endpoint for restlike connect server")
 
 	// Start network threads---------------------------------------------------
 
@@ -195,5 +190,4 @@ func main() {
 	jww.INFO.Printf("Closed restlike server")
 
 	os.Exit(0)
-
 }
