@@ -6,7 +6,7 @@ help consumers better understand our API and how it may be used.
 
 `main.go` contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
-This file initiates an xxdk E2E client. With that client established, a 
+This file initiates an xxdk E2E object. With that client established, a 
 REST-like client is built on top. Using a precanned contact object created
 in `restSingleUseServer` this REST-like client contacts the server with a simple
 request.
@@ -80,7 +80,7 @@ In order to verify the response, look at the client log for the string
 `Response: `:
 
 ```bash
- grep "Response: " restSingleUseClient/client.log 
+grep "Response: " restSingleUseClient/client.log 
 INFO 2022/07/07 11:43:42.923030 Response: content:"This is content"  headers:{headers:"this is a response"}
 INFO 2022/07/07 11:43:50.376968 Response: content:"This is content"  headers:{headers:"this is a response"}
 ```

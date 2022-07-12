@@ -3,9 +3,10 @@ module restConnectServer
 go 1.18
 
 require (
+	github.com/pkg/errors v0.9.1
 	github.com/spf13/jwalterweatherman v1.1.0
-	gitlab.com/elixxir/client v1.5.1-0.20220707223957-5b095fc07bc2
-	gitlab.com/elixxir/crypto v0.0.7-0.20220606201132-c370d5039cea
+	gitlab.com/elixxir/client v1.5.1-0.20220712214129-83531d271630
+	gitlab.com/elixxir/crypto v0.0.7-0.20220629210331-d568778d08c6
 	gitlab.com/xx_network/primitives v0.0.4-0.20220630163313-7890038258c6
 )
 
@@ -17,7 +18,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/ttacon/builder v0.0.0-20170518171403-c099f663e1c2 // indirect
 	github.com/ttacon/libphonenumber v1.2.1 // indirect
