@@ -71,21 +71,21 @@ func main() {
 	// Login to your client session-----------------------------------------------------
 
 	// Login with the same sessionPath and sessionPass used to call NewClient()
-	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
+	net, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
 	}
 
 	// Get reception identity (automatically created if one does not exist)
 	identityStorageKey := "identityStorageKey"
-	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, baseClient)
+	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, net)
 	if err != nil {
 		// If no extant xxdk.ReceptionIdentity, generate and store a new one
-		identity, err = xxdk.MakeReceptionIdentity(baseClient)
+		identity, err = xxdk.MakeReceptionIdentity(net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, baseClient)
+		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
@@ -98,17 +98,17 @@ func main() {
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
 	confirmChan := make(chan contact.Contact, 5)
-	xxdkClient, err := xxdk.Login(baseClient, &auth{confirmChan: confirmChan}, identity, params)
+	messenger, err := xxdk.Login(net, &auth{confirmChan: confirmChan}, identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
-	e2eClient := xxdkClient.GetE2E()
+	e2eClient := messenger.GetE2E()
 
 	// Start network threads------------------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = xxdkClient.StartNetworkFollower(networkFollowerTimeout)
+	err = messenger.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -133,7 +133,7 @@ func main() {
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status changes
-	xxdkClient.GetCmix().AddHealthCallback(
+	messenger.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -171,7 +171,7 @@ func main() {
 		// Check that the partner exists, if not send a request
 		_, err = e2eClient.GetPartner(recipientContact.ID)
 		if err != nil {
-			_, err = xxdkClient.GetAuth().Request(recipientContact, fact.FactList{})
+			_, err = messenger.GetAuth().Request(recipientContact, fact.FactList{})
 			if err != nil {
 				jww.FATAL.Panicf("Failed to send contact request to %s: %+v", recipientContact.ID.String(), err)
 			}
@@ -205,7 +205,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	err = xxdkClient.StopNetworkFollower()
+	err = messenger.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
