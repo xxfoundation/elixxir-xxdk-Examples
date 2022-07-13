@@ -24,7 +24,7 @@ endpoints with various request handling may be put here.
 In these instructions we will go over building a REST-like server using our
 example. This will not include instructions on running a client which sends
 requests. That documentation may be found in the [README.md for
-`restConnectClient`.](../restConnectClient/README.md)
+`restConnectClient`.](../restConnectClient/README.md).
 
 In order to run a server, the following commands may be run:
 

@@ -35,6 +35,10 @@ func main() {
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
 
+	// High level parameters for the network
+	e2eParams := xxdk.GetDefaultE2EParams()
+	connectionListParams := connect.DefaultConnectionListParams()
+
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
 
@@ -96,7 +100,6 @@ func main() {
 	writeContact(contactFilePath, identity.GetContact())
 
 	// Handle incoming connections---------------------------------------------
-	e2eParams := xxdk.GetDefaultE2EParams()
 
 	// Create callback for incoming connections
 	cb := func(connection connect.Connection) {
@@ -125,7 +128,6 @@ func main() {
 
 	// Start the connection server, which will allow clients to start
 	//connections with you
-	connectionListParams := connect.DefaultConnectionListParams()
 	connectServer, err := connect.StartServer(
 		identity, cb, net, e2eParams, connectionListParams)
 	if err != nil {
@@ -136,7 +138,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = connectServer.Messenger.StartNetworkFollower(networkFollowerTimeout)
+	err = connectServer.E2e.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -162,7 +164,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health
 	// status changes
-	connectServer.Messenger.GetCmix().AddHealthCallback(
+	connectServer.E2e.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -176,7 +178,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	err = connectServer.Messenger.StopNetworkFollower()
+	err = connectServer.E2e.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {

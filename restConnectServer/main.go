@@ -127,7 +127,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = restlikeServer.ConnectServer.Messenger.
+	err = restlikeServer.ConnectServer.E2e.
 		StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
@@ -154,7 +154,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network
 	// health status changes
-	restlikeServer.ConnectServer.Messenger.
+	restlikeServer.ConnectServer.E2e.
 		GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
@@ -170,7 +170,7 @@ func main() {
 	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
-	err = restlikeServer.ConnectServer.Messenger.
+	err = restlikeServer.ConnectServer.E2e.
 		StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)

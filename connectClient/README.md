@@ -1,4 +1,4 @@
-# xxdk Connect Client Example
+# xxdk Connection Client Example
 
 This mini-repository contains the example logic for running a basic connection
 client. This is provided by the xx network team as a springboard to
@@ -8,7 +8,7 @@ help consumers better understand our API and how it may be used.
 avoiding the usage of CLI flags for basic variables you may change in the code.
 This file initiates an xxdk E2E object. With that established, a connection 
 client is built on top. Using a precanned contact object created in 
-`connectServer` this connection client contacts the server with a simple 
+`connectServer` this client contacts the authenticated server with a simple 
 message.
 
 [`utils.go`](utils.go) contains utility functions for running the program. In this case,
@@ -37,7 +37,7 @@ go build -o server .
 This will initialize the server. You may verify its functionality by checking
 the `server.log`file. It is a long-running process which may be
 stopped by a user inputted kill signal. This will create a file
-`connectServer.xxc`, which is the contat file for the server. A connection
+`connectServer.xxc`, which is the contact file for the server. A connection
 client may parse this file in order to send a request to this server.
 
 ### Building a Client
