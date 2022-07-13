@@ -4,14 +4,14 @@ This mini-repository contains the example logic for running a basic REST-like
 connection client. This is provided by the xx network team as a springboard to
 help consumers better understand our API and how it may be used.
 
-`main.go` contains the crux of the logic. We avoid complicating our example by
+[`main.go`](main.go) contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
 This file initiates an xxdk E2E object. With that client established, a
 REST-like client is built on top. Using a precanned contact object created
 in `restConnectServer` this REST-like client contacts the server with a simple
 request.
 
-`utils.go` contains utility functions for running the program. In this case,
+[`utils.go`](utils.go) contains utility functions for running the program. In this case,
 we provide a tool initializing a log.
 
 ## Build Instructions
