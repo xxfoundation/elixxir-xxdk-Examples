@@ -1,4 +1,4 @@
-module restlikeClientExample
+module restSingleUseClient
 
 go 1.18
 

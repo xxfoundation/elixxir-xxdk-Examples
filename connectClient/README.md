@@ -6,7 +6,7 @@ help consumers better understand our API and how it may be used.
 
 `main.go` contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
-This file initiates an xxdk E2E client. With that established, a connection 
+This file initiates an xxdk E2E object. With that established, a connection 
 client is built on top. Using a precanned contact object created in 
 `connectServer` this connection client contacts the server with a simple 
 message.

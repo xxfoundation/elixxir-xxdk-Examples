@@ -69,7 +69,7 @@ func main() {
 	// Load client state and identity------------------------------------------
 
 	// Load with the same sessionPath and sessionPass used to call NewClient()
-	baseClient, err := xxdk.LoadCmix(statePath, []byte(statePass),
+	net, err := xxdk.LoadCmix(statePath, []byte(statePass),
 		xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
@@ -77,14 +77,14 @@ func main() {
 
 	// Get reception identity (automatically created if one does not exist)
 	identityStorageKey := "identityStorageKey"
-	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, baseClient)
+	identity, err := xxdk.LoadReceptionIdentity(identityStorageKey, net)
 	if err != nil {
 		// If no extant xxdk.ReceptionIdentity, generate and store a new one
-		identity, err = xxdk.MakeReceptionIdentity(baseClient)
+		identity, err = xxdk.MakeReceptionIdentity(net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, baseClient)
+		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
@@ -127,7 +127,7 @@ func main() {
 	//connections with you
 	connectionListParams := connect.DefaultConnectionListParams()
 	connectServer, err := connect.StartServer(
-		identity, cb, baseClient, e2eParams, connectionListParams)
+		identity, cb, net, e2eParams, connectionListParams)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to start connection server: %+v", err)
 	}

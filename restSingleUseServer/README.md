@@ -6,7 +6,7 @@ to help consumers better understand our API and how it may be used.
 
 `main.go` contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
-This file initiates an xxdk E2E client. With that client established, a 
+This file initiates an xxdk E2E object. With that client established, a 
 REST-like server is built on top. This program creates contact file 
 `restSingleUseServer.xxc` which may be used by a client to contact the server.
 

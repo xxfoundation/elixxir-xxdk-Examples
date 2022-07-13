@@ -1,4 +1,4 @@
-module restlikeServerExample
+module restSinglueUseServer
 
 go 1.18
 
