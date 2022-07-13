@@ -4,17 +4,17 @@ This mini-repository contains the example logic for running a basic connection
 client. This is provided by the xx network team as a springboard to
 help consumers better understand our API and how it may be used.
 
-`main.go` contains the crux of the logic. We avoid complicating our example by
+[`main.go`](main.go) contains the crux of the logic. We avoid complicating our example by
 avoiding the usage of CLI flags for basic variables you may change in the code.
 This file initiates an xxdk E2E object. With that established, a connection 
 client is built on top. Using a precanned contact object created in 
 `connectServer` this connection client contacts the server with a simple 
 message.
 
-`utils.go` contains utility functions for running the program. In this case,
+[`utils.go`](utils.go) contains utility functions for running the program. In this case,
 we provide a tool initializing a log.
 
-`listener.go` contains logic for handling the reception of a message via the
+[`listener.go`](listener.go) contains logic for handling the reception of a message via the
 established connection. In this example, it is very basic. We invite consumers
 to use this as a basis to implement more complex message listeners.
 
