@@ -20,13 +20,13 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "client2.log")
+	initLog(1, "client.log")
 
 	// Create a new client object-------------------------------------------------------
 
 	// Path to the recipient contact file
-	recipientContactPath := "contact.xxc"
-	myContactPath := "recipient.xxc"
+	recipientContactPath := "myE2eContact.xxc"
+	myContactPath := "recipientE2eContact.xxc"
 
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePathRecipient"
