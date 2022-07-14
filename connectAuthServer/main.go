@@ -3,9 +3,8 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/catalog"
 	"gitlab.com/elixxir/client/connect"
-	"gitlab.com/elixxir/client/restlike"
-	restConnect "gitlab.com/elixxir/client/restlike/connect"
 	"gitlab.com/elixxir/client/xxdk"
 	"io/fs"
 	"io/ioutil"
@@ -20,31 +19,23 @@ func main() {
 	initLog(1, "server.log")
 
 	// Create a new client object----------------------------------------------
-	// NOTE: For some (or all) of these parameters, you may want to use a
-	// configuration tool of some kind
 
 	// Set the output contact file path
-	contactFilePath := "restConnectServer.xxc"
+	contactFilePath := "authConnServer.xxc"
 
-	// Set state file parameters
+	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
 	statePass := "password"
-
-	// The following connects to mainnet. For historical reasons
-	// it is called a json file but it is actually a marshalled
-	// file with a cryptographic signature attached.
-	// This may change in the future.
+	// The following connects to mainnet. For historical reasons it is called
+	// a json file but it is actually a marshalled file with a cryptographic
+	// signature attached. This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
 
-	// Parameters for e2e client & restlike server
+	// High level parameters for the network
 	e2eParams := xxdk.GetDefaultE2EParams()
-	connParams := connect.DefaultConnectionListParams()
-
-	// Set the restlike parameters
-	exampleURI := restlike.URI("handleClient")
-	exampleMethod := restlike.Get
+	connectionListParams := connect.DefaultConnectionListParams()
 
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
@@ -63,23 +54,23 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL,
-				string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(
+				ndfURL, string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
 		}
 
-		// Initialize the state using the state file
+		// Initialize the state
 		err = xxdk.NewCmix(string(ndfJSON), statePath, []byte(statePass), "")
 		if err != nil {
 			jww.FATAL.Panicf("Failed to initialize state: %+v", err)
 		}
 	}
 
-	// Login to your client session--------------------------------------------
+	// Load client state and identity------------------------------------------
 
-	// Login with the same sessionPath and sessionPass used to call NewClient()
+	// Load with the same sessionPath and sessionPass used to call NewClient()
 	net, err := xxdk.LoadCmix(statePath, []byte(statePass),
 		xxdk.GetDefaultCMixParams())
 	if err != nil {
@@ -106,29 +97,49 @@ func main() {
 	// Save the contact file so that client can connect to this server
 	writeContact(contactFilePath, identity.GetContact())
 
-	// Start rest-like connect server------------------------------------------
-	restlikeServer, err := restConnect.NewServer(identity, net,
-		e2eParams, connParams)
-	if err != nil {
-		jww.FATAL.Panicf("Unable to start restlike connect server: %+v", err)
-	}
-	jww.INFO.Printf("Initialized restlike connect server")
+	// Handle incoming connections---------------------------------------------
+	// Create callback for incoming connections
+	cb := func(connection connect.AuthenticatedConnection) {
+		jww.INFO.Printf("Authenticated connection established with %s",
+			connection.GetPartner().PartnerId())
 
-	// Implement restlike endpoint---------------------------------------------
+		// Listen for all types of messages using catalog.NoType
+		// User-defined behavior for message reception goes in the listener
+		_, err = connection.RegisterListener(
+			catalog.NoType, &listener{"connection server listener"})
+		if err != nil {
+			jww.FATAL.Panicf("Failed to register listener: %+v", err)
+		}
 
-	// Add endpoint
-	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod, Callback)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
+		msgBody := "If this message is sent successfully, we'll have " +
+			"established contact with the client."
+
+		roundIDs, messageID, timeSent, err := connection.SendE2E(catalog.NoType,
+			[]byte(msgBody), e2eParams.Base)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to send message: %+v", err)
+		}
+		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID,
+			roundIDs, timeSent)
+
 	}
-	jww.DEBUG.Printf("Added endpoint for restlike connect server")
+
+	// Start connection server-------------------------------------------------
+
+	// Start the connection server, which will allow clients to start
+	//connections with you
+	authConnServer, err := connect.StartAuthenticatedServer(
+		identity, cb, net, e2eParams, connectionListParams)
+	if err != nil {
+		jww.FATAL.Panicf("Unable to start authenticated connection server: %+v",
+			err)
+	}
 
 	// Start network threads---------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = restlikeServer.ConnectServer.E2e.
-		StartNetworkFollower(networkFollowerTimeout)
+	err = authConnServer.E2e.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -152,10 +163,9 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network
-	// health status changes
-	restlikeServer.ConnectServer.E2e.
-		GetCmix().AddHealthCallback(
+	// Provide a callback that will be signalled when network health
+	// status changes
+	authConnServer.E2e.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -167,20 +177,15 @@ func main() {
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
-	err = restlikeServer.ConnectServer.E2e.
-		StopNetworkFollower()
+	err = authConnServer.E2e.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
 		jww.INFO.Printf("Stopped network follower.")
 	}
 
-	// Close server on function exit
-	restlikeServer.Close()
-	jww.INFO.Printf("Closed restlike server")
-
 	os.Exit(0)
+
 }

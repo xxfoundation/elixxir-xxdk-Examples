@@ -1,4 +1,4 @@
-module restConnectExample
+module connectAuthClientExample
 
 go 1.17
 
@@ -7,7 +7,6 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0
 	gitlab.com/elixxir/client v1.5.1-0.20220713213756-95ed0fc8e7cf
 	gitlab.com/elixxir/crypto v0.0.7-0.20220606201132-c370d5039cea
-	gitlab.com/xx_network/primitives v0.0.4-0.20220712193914-aebd8544396e
 )
 
 require (
@@ -28,6 +27,7 @@ require (
 	gitlab.com/elixxir/primitives v0.0.3-0.20220606195757-40f7a589347f // indirect
 	gitlab.com/xx_network/comms v0.0.4-0.20220630163702-f3d372ef6acd // indirect
 	gitlab.com/xx_network/crypto v0.0.5-0.20220606200528-3f886fe49e81 // indirect
+	gitlab.com/xx_network/primitives v0.0.4-0.20220712193914-aebd8544396e // indirect
 	gitlab.com/xx_network/ring v0.0.3-0.20220222211904-da613960ad93 // indirect
 	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect

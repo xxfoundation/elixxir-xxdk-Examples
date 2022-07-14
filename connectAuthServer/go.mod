@@ -1,4 +1,4 @@
-module restConnectExample
+module connectAuthServerExample
 
 go 1.17
 

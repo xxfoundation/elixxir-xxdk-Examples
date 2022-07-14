@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/client/catalog"
 	"gitlab.com/elixxir/client/connect"
-	"gitlab.com/elixxir/client/restlike"
-	restConnect "gitlab.com/elixxir/client/restlike/connect"
 	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/crypto/contact"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -17,34 +17,22 @@ import (
 
 func main() {
 	// Logging
-	initLog(1, "server.log")
+	initLog(1, "client.log")
 
 	// Create a new client object----------------------------------------------
-	// NOTE: For some (or all) of these parameters, you may want to use a
-	// configuration tool of some kind
 
-	// Set the output contact file path
-	contactFilePath := "restConnectServer.xxc"
+	// Path to the server contact file
+	serverContactPath := "authConnServer.xxc"
 
-	// Set state file parameters
+	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePath"
 	statePass := "password"
-
-	// The following connects to mainnet. For historical reasons
-	// it is called a json file but it is actually a marshalled
-	// file with a cryptographic signature attached.
-	// This may change in the future.
+	// The following connects to mainnet. For historical reasons it is called a
+	// json file but it is actually a marshalled file with a cryptographic
+	// signature attached. This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
-
-	// Parameters for e2e client & restlike server
-	e2eParams := xxdk.GetDefaultE2EParams()
-	connParams := connect.DefaultConnectionListParams()
-
-	// Set the restlike parameters
-	exampleURI := restlike.URI("handleClient")
-	exampleMethod := restlike.Get
 
 	// Check if state exists
 	if _, err := os.Stat(statePath); errors.Is(err, fs.ErrNotExist) {
@@ -63,14 +51,14 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL,
-				string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(
+				ndfURL, string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
 		}
 
-		// Initialize the state using the state file
+		// Initialize the state
 		err = xxdk.NewCmix(string(ndfJSON), statePath, []byte(statePass), "")
 		if err != nil {
 			jww.FATAL.Panicf("Failed to initialize state: %+v", err)
@@ -95,40 +83,29 @@ func main() {
 		if err != nil {
 			jww.FATAL.Panicf("Failed to generate reception identity: %+v", err)
 		}
-		err = xxdk.StoreReceptionIdentity(identityStorageKey, identity, net)
+		err = xxdk.StoreReceptionIdentity(
+			identityStorageKey, identity, net)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to store new reception identity: %+v", err)
 		}
 	}
 
-	// Save contact file-------------------------------------------------------
-
-	// Save the contact file so that client can connect to this server
-	writeContact(contactFilePath, identity.GetContact())
-
-	// Start rest-like connect server------------------------------------------
-	restlikeServer, err := restConnect.NewServer(identity, net,
-		e2eParams, connParams)
+	// Create an E2E client
+	// The `connect` packages handles AuthCallbacks,
+	// `xxdk.DefaultAuthCallbacks` is fine here
+	params := xxdk.GetDefaultE2EParams()
+	jww.INFO.Printf("Using E2E parameters: %+v", params)
+	messenger, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{},
+		identity, params)
 	if err != nil {
-		jww.FATAL.Panicf("Unable to start restlike connect server: %+v", err)
+		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
-	jww.INFO.Printf("Initialized restlike connect server")
 
-	// Implement restlike endpoint---------------------------------------------
-
-	// Add endpoint
-	err = restlikeServer.GetEndpoints().Add(exampleURI, exampleMethod, Callback)
-	if err != nil {
-		jww.FATAL.Panicf("Failed to add endpoint to server: %v", err)
-	}
-	jww.DEBUG.Printf("Added endpoint for restlike connect server")
-
-	// Start network threads---------------------------------------------------
+	// Start network threads----------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = restlikeServer.ConnectServer.E2e.
-		StartNetworkFollower(networkFollowerTimeout)
+	err = messenger.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -154,33 +131,77 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network
 	// health status changes
-	restlikeServer.ConnectServer.E2e.
-		GetCmix().AddHealthCallback(
+	messenger.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
+	// Connect with the server-------------------------------------------------
+
+	// Recipient's contact (read from a Client CLI-generated contact file)
+	contactData, err := ioutil.ReadFile(serverContactPath)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to read server contact file: %+v", err)
+	}
+
+	// Imported "gitlab.com/elixxir/crypto/contact"
+	// which provides an `Unmarshal` function to convert the
+	// byte slice ([]byte) output of `ioutil.ReadFile()` to the `Contact` type
+	// expected by `RequestAuthenticatedChannel()`
+	recipientContact, err := contact.Unmarshal(contactData)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to get contact data: %+v", err)
+	}
+	jww.INFO.Printf("Recipient contact: %+v", recipientContact)
+
+	// Create the connection
+	handler, err := connect.ConnectWithAuthentication(recipientContact, messenger, params)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
+	}
+	jww.INFO.Printf("Authenticated connection with %s successfully established!",
+		recipientContact.ID)
+
+	// Register a listener for messages----------------------------------------
+
+	// Listen for all types of messages using catalog.NoType
+	// User-defined behavior for message reception goes in the listener
+	_, err = handler.RegisterListener(catalog.NoType, listener{
+		name: "e2e Message Listener",
+	})
+	if err != nil {
+		jww.FATAL.Panicf("Could not register message listener: %+v", err)
+	}
+
+	// Send a message to the server--------------------------------------------
+
+	// Test message
+	msgBody := "If this message is sent successfully, we'll have established " +
+		"contact with the server."
+	roundIDs, messageID, timeSent, err := handler.SendE2E(
+		catalog.XxMessage, []byte(msgBody), params.Base)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to send message: %+v", err)
+	}
+	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v",
+		messageID, roundIDs, timeSent)
+
 	// Keep app running to receive messages------------------------------------
 
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
-	err = restlikeServer.ConnectServer.E2e.
-		StopNetworkFollower()
+	err = messenger.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
 		jww.INFO.Printf("Stopped network follower.")
 	}
 
-	// Close server on function exit
-	restlikeServer.Close()
-	jww.INFO.Printf("Closed restlike server")
-
 	os.Exit(0)
+
 }
