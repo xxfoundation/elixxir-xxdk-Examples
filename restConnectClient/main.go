@@ -113,7 +113,7 @@ func main() {
 	// xxdk.DefaultAuthCallbacks is fine here
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	messenger, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{},
+	user, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{},
 		identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
@@ -123,7 +123,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = messenger.StartNetworkFollower(networkFollowerTimeout)
+	err = user.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -149,7 +149,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health status
 	// changes
-	messenger.GetCmix().AddHealthCallback(
+	user.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -176,7 +176,7 @@ func main() {
 
 	// Establish connection with the server------------------------------------
 
-	handler, err := connect.Connect(serverContact, messenger, params)
+	handler, err := connect.Connect(serverContact, user, params)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
 	}
@@ -185,7 +185,7 @@ func main() {
 
 	// Construct request-------------------------------------------------------
 
-	stream := messenger.GetRng().GetStream()
+	stream := user.GetRng().GetStream()
 	defer stream.Close()
 
 	grp, err := identity.GetGroup()
@@ -241,7 +241,7 @@ func main() {
 	jww.DEBUG.Printf("Waiting for SIGTERM signal to close process")
 	<-c
 
-	err = messenger.StopNetworkFollower()
+	err = user.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
