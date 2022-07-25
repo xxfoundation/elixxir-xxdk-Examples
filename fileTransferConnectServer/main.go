@@ -103,70 +103,15 @@ func main() {
 	// Save the contact file so that client can connect to this server
 	writeContact(contactFilePath, identity.GetContact())
 
-	// Handle incoming connections and create file transfer manager------------
+	// Handle incoming connections---------------------------------------------
+
+	// When a channel is received, a new file transfer wrapper will be created
+	// to wait for new file transfers
+	connectionCh := make(chan connect.Connection, 10)
 
 	// Create callback for incoming connections
 	cb := func(connection connect.Connection) {
-
-		// Create general file transfer manager
-		ftParams := fileTransfer.DefaultParams()
-		ftManager, err := fileTransfer.NewManager(ftParams, identity.ID,
-			net.GetCmix(), net.GetStorage(), net.GetRng())
-		if err != nil {
-			jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
-		}
-
-		err = net.AddService(ftManager.StartProcesses)
-		if err != nil {
-			jww.FATAL.Panicf("Failed to start file transfer pcoesses: %+v", err)
-		}
-
-		// Create ReceiveCallback that is called when a new file transfer is received
-		receiveCB := func(tid *ftCrypto.TransferID, fileName, fileType string,
-			sender *id.ID, size uint32, preview []byte) {
-			// Inform the user that a new file transfer has been received
-			jww.INFO.Printf("Received new file %q transfer %s of type %s from %s "+
-				"of size %d bytes with preview: %q",
-				fileName, tid, fileType, sender, size, preview)
-
-			receivedProgressCB := func(completed bool, received, total uint16,
-				rt fileTransfer.ReceivedTransfer, t fileTransfer.FilePartTracker,
-				err error) {
-				// Show the file transfer progress to the user.
-				jww.INFO.Printf("Received progress callback for %q "+
-					"{completed: %t, received: %d, total: %d, err: %v}",
-					fileName, completed, received, total, err)
-
-				// Once the file is complete, receive the full file.
-				if completed {
-
-					fileData, err := ftManager.Receive(tid)
-					if err != nil {
-						jww.FATAL.Panicf("Failed to receive full file: %+v", err)
-					}
-
-					jww.INFO.Printf("Completed receiving file %q: %q",
-						fileName, fileData)
-				}
-			}
-
-			// Register received progress callback
-			err = ftManager.RegisterReceivedProgressCallback(
-				tid, receivedProgressCB, 0)
-			if err != nil {
-				jww.FATAL.Panicf(
-					"Failed to register received progress callback: %+v", err)
-			}
-		}
-
-		// Wrap the file transfer in the connection wrapper
-		ftConnectParams := ftConnect.DefaultParams()
-		_, err = ftConnect.NewWrapper(
-			receiveCB, ftConnectParams, ftManager, connection, net.GetCmix())
-		if err != nil {
-			jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
-		}
-
+		connectionCh <- connection
 	}
 
 	// Start connection server-------------------------------------------------
@@ -183,7 +128,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = connectServer.E2e.StartNetworkFollower(networkFollowerTimeout)
+	err = connectServer.User.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -209,12 +154,82 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health
 	// status changes
-	connectServer.E2e.GetCmix().AddHealthCallback(
+	connectServer.User.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
+
+	// Create file transfer manager--------------------------------------------
+
+	// Create general file transfer manager
+	ftParams := fileTransfer.DefaultParams()
+	ftManager, err := fileTransfer.NewManager(ftParams, connectServer.User)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
+	}
+
+	err = net.AddService(ftManager.StartProcesses)
+	if err != nil {
+		jww.FATAL.Panicf("Failed to start file transfer possesses: %+v", err)
+	}
+
+	// Create ReceiveCallback that is called when a new file transfer is received
+	receiveCB := func(tid *ftCrypto.TransferID, fileName, fileType string,
+		sender *id.ID, size uint32, preview []byte) {
+		// Inform the user that a new file transfer has been received
+		jww.INFO.Printf("Received new file %q transfer %s of type %s from %s "+
+			"of size %d bytes with preview: %q",
+			fileName, tid, fileType, sender, size, preview)
+
+		receivedProgressCB := func(completed bool, received, total uint16,
+			rt fileTransfer.ReceivedTransfer, t fileTransfer.FilePartTracker,
+			err error) {
+			// Show the file transfer progress to the user.
+			jww.INFO.Printf("Received progress callback for %q "+
+				"{completed: %t, received: %d, total: %d, err: %v}",
+				fileName, completed, received, total, err)
+
+			// Once the file is complete, receive the full file.
+			if completed {
+
+				fileData, err := ftManager.Receive(tid)
+				if err != nil {
+					jww.FATAL.Panicf("Failed to receive full file: %+v", err)
+				}
+
+				jww.INFO.Printf("Completed receiving file %q: %q",
+					fileName, fileData)
+			}
+		}
+
+		// Period is the duration to wait between calls to the progress
+		// callback. This prevents spamming of the progress callback when
+		// many updates occur in a short period of time.
+		period := 1 * time.Millisecond
+
+		// Register received progress callback
+		err = ftManager.RegisterReceivedProgressCallback(
+			tid, receivedProgressCB, period)
+		if err != nil {
+			jww.FATAL.Panicf(
+				"Failed to register received progress callback: %+v", err)
+		}
+	}
+
+	select {
+	case connection := <-connectionCh:
+		// Wrap the file transfer in the connection wrapper
+		ftConnectParams := ftConnect.DefaultParams()
+		_, err = ftConnect.NewWrapper(
+			receiveCB, ftConnectParams, ftManager, connection, net.GetCmix())
+		if err != nil {
+			jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
+		}
+	case <-time.After(5 * time.Minute):
+		jww.FATAL.Panicf("Failed to receive connection.")
+	}
 
 	// Keep app running to receive messages------------------------------------
 
@@ -223,7 +238,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	err = connectServer.E2e.StopNetworkFollower()
+	err = connectServer.User.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {

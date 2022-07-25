@@ -101,8 +101,7 @@ func main() {
 	// xxdk.DefaultAuthCallbacks is fine here
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
-	messenger, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{},
-		identity, params)
+	user, err := xxdk.Login(net, xxdk.DefaultAuthCallbacks{}, identity, params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
@@ -111,7 +110,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = messenger.StartNetworkFollower(networkFollowerTimeout)
+	err = user.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -137,7 +136,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network
 	// health status changes
-	messenger.GetCmix().AddHealthCallback(
+	user.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -163,7 +162,7 @@ func main() {
 	jww.INFO.Printf("Recipient contact: %+v", recipientContact)
 
 	// Create the connection
-	handler, err := connect.Connect(recipientContact, messenger, params)
+	handler, err := connect.Connect(recipientContact, user, params)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to create connection object: %+v", err)
 	}
@@ -174,15 +173,14 @@ func main() {
 
 	// Create general file transfer manager
 	ftParams := fileTransfer.DefaultParams()
-	ftManager, err := fileTransfer.NewManager(ftParams, identity.ID,
-		messenger.GetCmix(), messenger.GetStorage(), messenger.GetRng())
+	ftManager, err := fileTransfer.NewManager(ftParams, user)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
 	}
 
-	err = messenger.AddService(ftManager.StartProcesses)
+	err = user.AddService(ftManager.StartProcesses)
 	if err != nil {
-		jww.FATAL.Panicf("Failed to start file transfer pcoesses: %+v", err)
+		jww.FATAL.Panicf("Failed to start file transfer possesses: %+v", err)
 	}
 
 	// Create ReceiveCallback that is called when a new file transfer is received
@@ -214,7 +212,7 @@ func main() {
 	// Wrap the file transfer in the connection wrapper
 	ftConnectParams := ftConnect.DefaultParams()
 	ftWrapper, err := ftConnect.NewWrapper(
-		receiveCB, ftConnectParams, ftManager, handler, messenger.GetCmix())
+		receiveCB, ftConnectParams, ftManager, handler, user.GetCmix())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to create file transfer manager: %+v", err)
 	}
@@ -245,9 +243,14 @@ func main() {
 	// allows for half the parts to be resent on failure.
 	retryRate := float32(1.5)
 
+	// Period is the duration to wait between calls to the progress callback.
+	// This prevents spamming of the progress callback when many updates occur
+	// in a short period of time.
+	period := 1 * time.Millisecond
+
 	// Send file
-	tid, err := ftWrapper.Send(recipientContact.ID, fileName, fileType,
-		fileData, retryRate, preview, progressCB, 0)
+	tid, err := ftWrapper.Send(
+		fileName, fileType, fileData, retryRate, preview, progressCB, period)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to send file: %+v", err)
 	}
@@ -260,7 +263,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	err = messenger.StopNetworkFollower()
+	err = user.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
