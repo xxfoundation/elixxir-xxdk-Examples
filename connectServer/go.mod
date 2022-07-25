@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/spf13/jwalterweatherman v1.1.0
-	gitlab.com/elixxir/client v1.5.1-0.20220713213756-95ed0fc8e7cf
+	gitlab.com/elixxir/client v1.5.1-0.20220725172207-3ef87e8c794c
 	gitlab.com/elixxir/crypto v0.0.7-0.20220606201132-c370d5039cea
 	gitlab.com/xx_network/primitives v0.0.4-0.20220712193914-aebd8544396e
 )
