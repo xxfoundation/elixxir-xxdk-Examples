@@ -138,7 +138,7 @@ func main() {
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
-	err = connectServer.E2e.StartNetworkFollower(networkFollowerTimeout)
+	err = connectServer.User.StartNetworkFollower(networkFollowerTimeout)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to start network follower: %+v", err)
 	}
@@ -164,7 +164,7 @@ func main() {
 	connected := make(chan bool, 10)
 	// Provide a callback that will be signalled when network health
 	// status changes
-	connectServer.E2e.GetCmix().AddHealthCallback(
+	connectServer.User.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
 		})
@@ -178,7 +178,7 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
-	err = connectServer.E2e.StopNetworkFollower()
+	err = connectServer.User.StopNetworkFollower()
 	if err != nil {
 		jww.ERROR.Printf("Failed to stop network follower: %+v", err)
 	} else {
