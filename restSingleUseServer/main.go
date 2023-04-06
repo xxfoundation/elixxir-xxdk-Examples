@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/restlike"
-	"gitlab.com/elixxir/client/restlike/single"
-	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/client/v4/restlike"
+	"gitlab.com/elixxir/client/v4/restlike/single"
+	"gitlab.com/elixxir/client/v4/xxdk"
 	"io/fs"
 	"io/ioutil"
 	"os"
