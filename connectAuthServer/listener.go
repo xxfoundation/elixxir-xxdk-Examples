@@ -2,7 +2,7 @@ package main
 
 import (
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/e2e/receive"
+	"gitlab.com/elixxir/client/v4/e2e/receive"
 )
 
 // listener adheres to the receive.Listener interface.

@@ -4,9 +4,9 @@ package main
 import (
 	"errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/fileTransfer"
-	ftConnect "gitlab.com/elixxir/client/fileTransfer/connect"
-	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/client/v4/fileTransfer"
+	ftConnect "gitlab.com/elixxir/client/v4/fileTransfer/connect"
+	"gitlab.com/elixxir/client/v4/xxdk"
 	ftCrypto "gitlab.com/elixxir/crypto/fileTransfer"
 	"gitlab.com/xx_network/primitives/id"
 	"io/fs"
@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/elixxir/client/connect"
+	"gitlab.com/elixxir/client/v4/connect"
 	"gitlab.com/elixxir/crypto/contact"
 )
 

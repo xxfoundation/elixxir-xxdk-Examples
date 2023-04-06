@@ -3,7 +3,7 @@ package main
 import (
 	jww "github.com/spf13/jwalterweatherman"
 
-	"gitlab.com/elixxir/client/e2e/receive"
+	"gitlab.com/elixxir/client/v4/e2e/receive"
 )
 
 // listener implements the receive.Listener interface

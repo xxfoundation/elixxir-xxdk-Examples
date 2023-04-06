@@ -4,8 +4,8 @@ package main
 import (
 	"errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/catalog"
-	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/client/v4/catalog"
+	"gitlab.com/elixxir/client/v4/xxdk"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"gitlab.com/elixxir/client/connect"
+	"gitlab.com/elixxir/client/v4/connect"
 	"gitlab.com/elixxir/crypto/contact"
 )
 
@@ -182,13 +182,13 @@ func main() {
 	// Test message
 	msgBody := "If this message is sent successfully, we'll have established " +
 		"contact with the server."
-	roundIDs, messageID, timeSent, err := handler.SendE2E(
+	sendReport, err := handler.SendE2E(
 		catalog.XxMessage, []byte(msgBody), params.Base)
 	if err != nil {
 		jww.FATAL.Panicf("Failed to send message: %+v", err)
 	}
 	jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v",
-		messageID, roundIDs, timeSent)
+		sendReport.MessageId, sendReport.RoundList, sendReport.SentTime)
 
 	// Keep app running to receive messages------------------------------------
 
