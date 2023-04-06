@@ -4,8 +4,8 @@ package main
 import (
 	"errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/client/catalog"
-	"gitlab.com/elixxir/client/xxdk"
+	"gitlab.com/elixxir/client/v4/catalog"
+	"gitlab.com/elixxir/client/v4/xxdk"
 	"gitlab.com/elixxir/primitives/fact"
 	"gitlab.com/xx_network/primitives/id"
 	"io/fs"
@@ -22,7 +22,7 @@ func main() {
 	// Logging
 	initLog(1, "client.log")
 
-	// Create a new client object-------------------------------------------------------
+	// Create a new client object-----------------------------------------------
 
 	// Path to the recipient contact file
 	recipientContactPath := "myE2eContact.xxc"
@@ -31,9 +31,9 @@ func main() {
 	// You would ideally use a configuration tool to acquire these parameters
 	statePath := "statePathRecipient"
 	statePass := "password"
-	// The following connects to mainnet. For historical reasons it is called a json file
-	// but it is actually a marshalled file with a cryptographic signature attached.
-	// This may change in the future.
+	// The following connects to mainnet. For historical reasons it is called a
+	// json file but it is actually a marshalled file with a cryptographic
+	// signature attached. This may change in the future.
 	ndfURL := "https://elixxir-bins.s3.us-west-1.amazonaws.com/ndf/mainnet.json"
 	certificatePath := "../mainnet.crt"
 	ndfPath := "ndf.json"
@@ -55,7 +55,8 @@ func main() {
 				jww.FATAL.Panicf("Failed to read certificate: %v", err)
 			}
 
-			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL, string(cert))
+			ndfJSON, err = xxdk.DownloadAndVerifySignedNdfWithUrl(ndfURL,
+				string(cert))
 			if err != nil {
 				jww.FATAL.Panicf("Failed to download NDF: %+v", err)
 			}
@@ -68,10 +69,11 @@ func main() {
 		}
 	}
 
-	// Login to your client session-----------------------------------------------------
+	// Login to your client session---------------------------------------------
 
 	// Login with the same sessionPath and sessionPass used to call NewClient()
-	net, err := xxdk.LoadCmix(statePath, []byte(statePass), xxdk.GetDefaultCMixParams())
+	net, err := xxdk.LoadCmix(statePath, []byte(statePass),
+		xxdk.GetDefaultCMixParams())
 	if err != nil {
 		jww.FATAL.Panicf("Failed to load state: %+v", err)
 	}
@@ -98,13 +100,14 @@ func main() {
 	params := xxdk.GetDefaultE2EParams()
 	jww.INFO.Printf("Using E2E parameters: %+v", params)
 	confirmChan := make(chan contact.Contact, 5)
-	user, err := xxdk.Login(net, &auth{confirmChan: confirmChan}, identity, params)
+	user, err := xxdk.Login(net, &auth{confirmChan: confirmChan}, identity,
+		params)
 	if err != nil {
 		jww.FATAL.Panicf("Unable to Login: %+v", err)
 	}
 	e2eClient := user.GetE2E()
 
-	// Start network threads------------------------------------------------------------
+	// Start network threads----------------------------------------------------
 
 	// Set networkFollowerTimeout to a value of your choice (seconds)
 	networkFollowerTimeout := 5 * time.Second
@@ -132,7 +135,8 @@ func main() {
 
 	// Create a tracker channel to be notified of network changes
 	connected := make(chan bool, 10)
-	// Provide a callback that will be signalled when network health status changes
+	// Provide a callback that will be signalled when network health status
+	//changes
 	user.GetCmix().AddHealthCallback(
 		func(isConnected bool) {
 			connected <- isConnected
@@ -140,14 +144,15 @@ func main() {
 	// Wait until connected or crash on timeout
 	waitUntilConnected(connected)
 
-	// Register a listener for messages--------------------------------------------------
+	// Register a listener for messages-----------------------------------------
 
 	// Listen for all types of messages using catalog.NoType
 	// Listen for messages from all users using id.ZeroUser
 	// User-defined behavior for message reception goes in the listener
-	_ = e2eClient.RegisterListener(&id.ZeroUser, catalog.NoType, listener{name: "e2e Message Listener"})
+	_ = e2eClient.RegisterListener(
+		&id.ZeroUser, catalog.NoType, listener{name: "e2e Message Listener"})
 
-	// Connect with the recipient--------------------------------------------------
+	// Connect with the recipient-----------------------------------------------
 
 	if recipientContactPath != "" {
 		// Wait for 30 seconds to ensure network connectivity
@@ -160,8 +165,9 @@ func main() {
 		}
 
 		// Imported "gitlab.com/elixxir/crypto/contact"
-		// which provides an `Unmarshal` function to convert the byte slice ([]byte) output
-		// of `ioutil.ReadFile()` to the `Contact` type expected by `RequestAuthenticatedChannel()`
+		// which provides an `Unmarshal` function to convert the byte slice
+		// ([]byte) output of `ioutil.ReadFile()` to the `Contact` type expected
+		// by `RequestAuthenticatedChannel()`
 		recipientContact, err := contact.Unmarshal(contactData)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to get contact data: %+v", err)
@@ -173,32 +179,37 @@ func main() {
 		if err != nil {
 			_, err = user.GetAuth().Request(recipientContact, fact.FactList{})
 			if err != nil {
-				jww.FATAL.Panicf("Failed to send contact request to %s: %+v", recipientContact.ID.String(), err)
+				jww.FATAL.Panicf("Failed to send contact request to %s: %+v",
+					recipientContact.ID.String(), err)
 			}
 			timeout := time.NewTimer(30 * time.Second)
 			select {
 			case pc := <-confirmChan:
 				if !pc.ID.Cmp(recipientContact.ID) {
-					jww.FATAL.Panicf("Did not receive confirmation for the requested contact")
+					jww.FATAL.Panicf(
+						"Did not receive confirmation for the requested contact")
 				}
 				break
 			case <-timeout.C:
-				jww.FATAL.Panicf("Timed out waiting to receive confirmation of e2e relationship with partner")
+				jww.FATAL.Panicf(
+					"Timed out waiting to receive confirmation of e2e relationship with partner")
 			}
 		}
 
-		// Send a message to the recipient----------------------------------------------------
+		// Send a message to the recipient--------------------------------------
 
 		// Test message
 		msgBody := "If this message is sent successfully, we'll have established contact with the recipient."
-		roundIDs, messageID, timeSent, err := e2eClient.SendE2E(catalog.XxMessage, recipientContact.ID, []byte(msgBody), params.Base)
+		sendReport, err := e2eClient.SendE2E(
+			catalog.XxMessage, recipientContact.ID, []byte(msgBody), params.Base)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to send message: %+v", err)
 		}
-		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v", messageID, roundIDs, timeSent)
+		jww.INFO.Printf("Message %v sent in RoundIDs: %+v at %v",
+			sendReport.MessageId, sendReport.RoundList, sendReport.SentTime)
 	}
 
-	// Keep app running to receive messages-----------------------------------------------
+	// Keep app running to receive messages-------------------------------------
 
 	// Wait until the user terminates the program
 	c := make(chan os.Signal)
